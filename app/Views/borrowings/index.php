@@ -1,0 +1,1 @@
+<?= $this->extend('layouts/app') ?><?= $this->section('content') ?><?= view('partials/breadcrumbs',['title'=>$title,'subtitle'=>$history?'Completed, rejected, and cancelled requests.':'Equipment currently released to borrowers.']) ?><section class="panel"><?= view('borrow_requests/_table',['requests'=>$rows]) ?></section><?= $this->endSection() ?>

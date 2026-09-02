@@ -1,0 +1,1 @@
+<?= $this->extend('layouts/app') ?><?= $this->section('content') ?><?= view('partials/breadcrumbs',['title'=>'Returns','subtitle'=>'Completed equipment returns and recorded inspections.']) ?><section class="panel"><?= view('borrow_requests/_table',['requests'=>$rows]) ?></section><?= $this->endSection() ?>

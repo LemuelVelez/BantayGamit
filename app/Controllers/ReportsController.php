@@ -1,0 +1,9 @@
+<?php
+namespace App\Controllers;
+use App\Application\Services\ReportingService;
+class ReportsController extends BaseController {
+ private function input():array{$type=(string)$this->request->getGet('type');if(!in_array($type,['inventory','available','borrowed','overdue','damaged','maintenance','history'],true))$type='inventory';return [$type,['from'=>(string)$this->request->getGet('from'),'to'=>(string)$this->request->getGet('to'),'category_id'=>(int)$this->request->getGet('category_id'),'status'=>(string)$this->request->getGet('status'),'borrower_id'=>(int)$this->request->getGet('borrower_id'),'equipment_id'=>(int)$this->request->getGet('equipment_id')]];}
+ public function index(){try{$this->borrowingService()->refreshOverdue();}catch(\Throwable){}[$type,$filters]=$this->input();return view('reports/index',['title'=>'Reports','type'=>$type,'filters'=>$filters,'rows'=>(new ReportingService())->report($type,$filters),'categories'=>$this->repository()->categories(true),'equipment'=>$this->repository()->equipment(),'borrowers'=>db_connect()->table('users')->select('id,display_name')->where(['role'=>'borrower','status'=>'active'])->orderBy('display_name')->get()->getResultArray()]);}
+ public function print(){try{$this->borrowingService()->refreshOverdue();}catch(\Throwable){}[$type,$filters]=$this->input();return view('reports/print',['title'=>'BantayGamit Report','type'=>$type,'filters'=>$filters,'rows'=>(new ReportingService())->report($type,$filters)]);}
+ public function csv(){try{$this->borrowingService()->refreshOverdue();}catch(\Throwable){}[$type,$filters]=$this->input();$rows=(new ReportingService())->report($type,$filters);$name='bantaygamit-'.$type.'-'.date('Ymd-His').'.csv';$fh=fopen('php://temp','r+');if($rows){fputcsv($fh,array_keys($rows[0]));foreach($rows as $row)fputcsv($fh,$row);}rewind($fh);$csv=stream_get_contents($fh);fclose($fh);return $this->response->download($name,$csv);}
+}
