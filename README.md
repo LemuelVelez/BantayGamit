@@ -33,12 +33,12 @@ Role filters protect restricted URLs on the server. Borrower request ownership i
 - User administration and account activation/deactivation
 - Per-user notifications
 - Audit logging for important actions
-- Operational reports with printer-friendly output and CSV export
+- Operational reports with printer-friendly output and styled, color-coded XLSX export
 - Responsive Berry-inspired header, sidebar/drawer, cards, tables, forms, chips, alerts, and confirmation dialog
 
 ## Requirements
 
-- PHP 8.2 or newer with `intl`, `mbstring`, and `mysqli` enabled
+- PHP 8.2 or newer with `intl`, `mbstring`, `mysqli`, `gd`, `xml`, and `zip` enabled
 - Composer 2
 - MySQL 8+ or compatible MySQL/MariaDB server
 - A web server whose production document root points to `public/`
@@ -50,6 +50,12 @@ Role filters protect restricted URLs on the server. Borrower request ownership i
 
 ```bash
 composer install
+```
+
+If you are applying an update to an already-installed checkout and `composer.lock` does not yet contain PhpSpreadsheet, run:
+
+```bash
+composer update phpoffice/phpspreadsheet -W
 ```
 
 3. Copy `.env.example` to `.env` and update the database credentials.
@@ -64,6 +70,14 @@ php spark migrate
 
 ```bash
 php spark db:seed BantayGamitSeeder
+```
+
+The master seeder runs the dependency-ordered seeders for users, categories, locations, equipment, borrowing workflows, maintenance, historical report data, notifications, settings, and audit logs. Individual seeders can also be run directly, for example:
+
+```bash
+php spark db:seed UserSeeder
+php spark db:seed EquipmentSeeder
+php spark db:seed ReportDataSeeder
 ```
 
 7. Start the local server:
@@ -100,7 +114,11 @@ These are intentional development seeder credentials and must not be used in pro
 | --- | --- | --- |
 | Administrator | `admin` | `Admin@12345` |
 | Barangay Official | `official` | `Official@12345` |
+| Barangay Official | `official2` | `Official2@12345` |
 | Borrower | `borrower` | `Borrower@12345` |
+| Borrower | `juan` | `Borrower@12345` |
+| Borrower | `ana` | `Borrower@12345` |
+| Borrower | `mario` | `Borrower@12345` |
 
 ## Database
 
@@ -127,7 +145,7 @@ app/
 ├── Config/                      Explicit routes and BantayGamit configuration
 ├── Controllers/                 Thin request/response controllers
 ├── Database/Migrations/         Full schema initialization
-├── Database/Seeds/              Development demonstration data
+├── Database/Seeds/              Dependency-ordered development/demo seeders
 ├── Domain/Repositories/         Equipment repository contract
 ├── Filters/                     Authentication and role authorization
 ├── Helpers/                     Shared icon/label/date helpers

@@ -16,7 +16,7 @@ $routes->group('',['filter'=>'auth'],static function(RouteCollection $routes):vo
   $routes->get('equipment/new','EquipmentController::create');$routes->post('equipment','EquipmentController::store');$routes->get('equipment/(:num)/edit','EquipmentController::edit/$1');$routes->post('equipment/(:num)','EquipmentController::update/$1');
   $routes->post('borrow-requests/(:num)/approve','BorrowRequestsController::approve/$1');$routes->post('borrow-requests/(:num)/reject','BorrowRequestsController::reject/$1');$routes->post('borrow-requests/(:num)/release','BorrowRequestsController::release/$1');$routes->post('borrow-requests/(:num)/return','BorrowRequestsController::recordReturn/$1');
   $routes->get('returns','ReturnsController::index');$routes->get('maintenance','MaintenanceController::index');$routes->post('maintenance','MaintenanceController::store');$routes->post('maintenance/(:num)/status','MaintenanceController::status/$1');
-  $routes->get('reports','ReportsController::index');$routes->get('reports/print','ReportsController::print');$routes->get('reports/csv','ReportsController::csv');
+  $routes->get('reports','ReportsController::index');$routes->get('reports/print','ReportsController::print');$routes->get('reports/xlsx','ReportsController::xlsx');
  });
  $routes->group('',['filter'=>'role:admin'],static function(RouteCollection $routes):void{
   $routes->get('equipment-categories','EquipmentCategoriesController::index');$routes->post('equipment-categories','EquipmentCategoriesController::store');$routes->post('equipment-categories/(:num)','EquipmentCategoriesController::update/$1');$routes->post('equipment-categories/(:num)/status','EquipmentCategoriesController::status/$1');
