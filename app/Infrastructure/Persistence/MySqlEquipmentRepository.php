@@ -142,6 +142,7 @@ class MySqlEquipmentRepository implements EquipmentRepositoryInterface
         if($role==='barangay_official'){
             $stats['approvedToRelease']=$this->db->table('borrow_requests')->where('status','approved')->countAllResults();
             $stats['dueToday']=$this->db->table('borrow_requests')->whereIn('status',['released','overdue'])->where('expected_return_date',date('Y-m-d'))->countAllResults();
+            $stats['returnsToInspect']=$this->db->table('borrow_requests')->whereIn('status',['released','overdue'])->countAllResults();
         }
         return $stats;
     }

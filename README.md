@@ -38,42 +38,41 @@ Role filters protect restricted URLs on the server. Borrower request ownership i
 
 ## Requirements
 
-- PHP 8.2 or newer with extensions required by CodeIgniter 4
+- PHP 8.2 or newer with `intl`, `mbstring`, and `mysqli` enabled
 - Composer 2
 - MySQL 8+ or compatible MySQL/MariaDB server
 - A web server whose production document root points to `public/`
 
 ## Installation
 
-1. Create the project at `~/Documents/Projects/BantayGamit` using a CodeIgniter 4.7+ appstarter/TallyTech-compatible base.
-2. Place the BantayGamit modified files in that project root, preserving their paths.
-3. Run:
+1. Place the `BantayGamit` project at `~/Documents/Projects/BantayGamit`.
+2. Run:
 
 ```bash
 composer install
 ```
 
-4. Copy `.env.example` to `.env` and update the database credentials.
-5. Create an empty MySQL database named `bantay_gamit`.
-6. Initialize the schema:
+3. Copy `.env.example` to `.env` and update the database credentials.
+4. Create an empty MySQL database named `bantay_gamit`.
+5. Initialize the schema:
 
 ```bash
 php spark migrate
 ```
 
-7. Load development/demo data only in a development environment:
+6. Load development/demo data only in a development environment:
 
 ```bash
 php spark db:seed BantayGamitSeeder
 ```
 
-8. Start the local server:
+7. Start the local server:
 
 ```bash
 php spark serve
 ```
 
-Open `http://localhost:8080/`.
+Open `http://localhost:8080/`. The application timezone is configured as `Asia/Manila`.
 
 ## Environment
 
@@ -160,4 +159,3 @@ composer test
 ```
 
 The included unit tests cover authentication behavior, valid/invalid request status transitions, overdue rules, and over-return prevention. Database-backed workflow tests can be added using CodeIgniter's `DatabaseTestTrait` when a dedicated test database is configured.
-# BantayGamit
