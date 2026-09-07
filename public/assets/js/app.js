@@ -77,6 +77,174 @@
         if (accountMenu && !accountMenu.contains(event.target)) closeAccount();
     });
 
+    let customSelectSequence = 0;
+    const customSelects = new Set();
+
+    const closeCustomSelect = (wrapper, restoreFocus = false) => {
+        if (!wrapper) return;
+        const trigger = wrapper.querySelector('.custom-select-trigger');
+        const menu = wrapper.querySelector('.custom-select-menu');
+        wrapper.classList.remove('is-open');
+        menu?.setAttribute('hidden', '');
+        trigger?.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) trigger?.focus({ preventScroll: true });
+    };
+
+    const closeOtherCustomSelects = (except = null) => {
+        customSelects.forEach((wrapper) => {
+            if (wrapper !== except) closeCustomSelect(wrapper);
+        });
+    };
+
+    const getSelectFieldLabel = (select) => {
+        const explicit = select.getAttribute('aria-label');
+        if (explicit) return explicit;
+        const label = select.closest('label');
+        if (!label) return select.name || 'Select option';
+        const text = [...label.childNodes]
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent.trim())
+            .filter(Boolean)
+            .join(' ');
+        return text || select.name || 'Select option';
+    };
+
+    const enhanceSelect = (select) => {
+        if (!(select instanceof HTMLSelectElement) || select.multiple || select.size > 1 || select.dataset.customSelect === 'ready') return null;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'custom-select';
+        const menuId = `custom-select-menu-${++customSelectSequence}`;
+        const fieldLabel = getSelectFieldLabel(select);
+
+        select.parentNode.insertBefore(wrapper, select);
+        wrapper.appendChild(select);
+        select.classList.add('custom-select-native');
+        select.dataset.customSelect = 'ready';
+        select.tabIndex = -1;
+
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'custom-select-trigger';
+        trigger.setAttribute('aria-haspopup', 'listbox');
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-controls', menuId);
+
+        const value = document.createElement('span');
+        value.className = 'custom-select-value';
+        const chevron = document.createElement('span');
+        chevron.className = 'custom-select-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        trigger.append(value, chevron);
+
+        const menu = document.createElement('div');
+        menu.className = 'custom-select-menu';
+        menu.id = menuId;
+        menu.setAttribute('role', 'listbox');
+        menu.setAttribute('hidden', '');
+        wrapper.append(trigger, menu);
+        customSelects.add(wrapper);
+
+        const optionButtons = [];
+        [...select.options].forEach((option, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'custom-select-option';
+            button.setAttribute('role', 'option');
+            button.dataset.optionIndex = String(index);
+            button.textContent = option.textContent;
+            button.disabled = option.disabled;
+            button.hidden = option.hidden;
+            menu.appendChild(button);
+            optionButtons.push(button);
+
+            button.addEventListener('click', () => {
+                if (button.disabled) return;
+                select.selectedIndex = index;
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                closeCustomSelect(wrapper, true);
+            });
+        });
+
+        const sync = () => {
+            const selectedIndex = select.selectedIndex >= 0 ? select.selectedIndex : 0;
+            const selected = select.options[selectedIndex];
+            value.textContent = selected?.textContent || 'Select an option';
+            trigger.disabled = select.disabled;
+            trigger.setAttribute('aria-label', `${fieldLabel}: ${value.textContent}`);
+            wrapper.classList.toggle('is-disabled', select.disabled);
+            wrapper.classList.toggle('is-invalid', select.getAttribute('aria-invalid') === 'true');
+            optionButtons.forEach((button, index) => {
+                button.setAttribute('aria-selected', index === select.selectedIndex ? 'true' : 'false');
+            });
+        };
+
+        const open = (focusSelected = false) => {
+            if (select.disabled) return;
+            closeOtherCustomSelects(wrapper);
+            wrapper.classList.add('is-open');
+            menu.removeAttribute('hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+            if (focusSelected) {
+                requestAnimationFrame(() => {
+                    const selectedButton = optionButtons[select.selectedIndex] || optionButtons.find((button) => !button.disabled && !button.hidden);
+                    selectedButton?.focus({ preventScroll: true });
+                    selectedButton?.scrollIntoView({ block: 'nearest' });
+                });
+            }
+        };
+
+        trigger.addEventListener('click', () => {
+            if (wrapper.classList.contains('is-open')) closeCustomSelect(wrapper);
+            else open(false);
+        });
+
+        trigger.addEventListener('keydown', (event) => {
+            if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+                event.preventDefault();
+                open(true);
+            }
+        });
+
+        menu.addEventListener('keydown', (event) => {
+            const enabled = optionButtons.filter((button) => !button.disabled && !button.hidden);
+            if (!enabled.length) return;
+            const current = enabled.indexOf(document.activeElement);
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const direction = event.key === 'ArrowDown' ? 1 : -1;
+                const next = current < 0 ? 0 : (current + direction + enabled.length) % enabled.length;
+                enabled[next].focus({ preventScroll: true });
+                enabled[next].scrollIntoView({ block: 'nearest' });
+            } else if (event.key === 'Home' || event.key === 'End') {
+                event.preventDefault();
+                const target = event.key === 'Home' ? enabled[0] : enabled[enabled.length - 1];
+                target.focus({ preventScroll: true });
+                target.scrollIntoView({ block: 'nearest' });
+            } else if (event.key === 'Escape' || event.key === 'Tab') {
+                closeCustomSelect(wrapper, event.key === 'Escape');
+            }
+        });
+
+        select.addEventListener('change', sync);
+        select.addEventListener('invalid', () => {
+            wrapper.classList.add('is-invalid');
+            requestAnimationFrame(() => trigger.focus({ preventScroll: false }));
+        });
+        select.form?.addEventListener('reset', () => requestAnimationFrame(sync));
+        sync();
+        return wrapper;
+    };
+
+    document.querySelectorAll('select').forEach(enhanceSelect);
+
+    document.addEventListener('click', (event) => {
+        customSelects.forEach((wrapper) => {
+            if (!wrapper.contains(event.target)) closeCustomSelect(wrapper);
+        });
+    });
+
     const updatePasswordToggle = (button, input, visible) => {
         input.type = visible ? 'text' : 'password';
         button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
@@ -158,7 +326,8 @@
         const fragment = itemTemplate.content.cloneNode(true);
         const select = fragment.querySelector('select[name="equipment_id[]"]');
         requestItems.append(fragment);
-        select?.focus({ preventScroll: true });
+        const customSelect = select ? enhanceSelect(select) : null;
+        customSelect?.querySelector('.custom-select-trigger')?.focus({ preventScroll: true });
     });
 
     requestItems?.addEventListener('click', (event) => {
@@ -248,6 +417,7 @@
         if (event.key === 'Escape') {
             closeNav();
             closeAccount();
+            closeOtherCustomSelects();
         }
     });
 
