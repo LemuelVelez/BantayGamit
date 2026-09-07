@@ -1,31 +1,61 @@
 (() => {
     const body = document.body;
     const navToggle = document.querySelector('[data-nav-toggle]');
+    const desktopNav = window.matchMedia('(min-width: 901px)');
+    const sidebarPreferenceKey = 'bantaygamit.sidebar.collapsed';
+
+    const setToggleState = (expanded, label) => {
+        navToggle?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        if (label) navToggle?.setAttribute('aria-label', label);
+    };
+
+    const applyDesktopSidebarPreference = () => {
+        if (!desktopNav.matches) {
+            body.classList.remove('sidebar-collapsed');
+            return;
+        }
+        let collapsed = false;
+        try {
+            collapsed = localStorage.getItem(sidebarPreferenceKey) === '1';
+        } catch (_) {}
+        body.classList.toggle('sidebar-collapsed', collapsed);
+        setToggleState(!collapsed, collapsed ? 'Expand navigation' : 'Collapse navigation');
+    };
 
     const closeNav = () => {
         body.classList.remove('nav-open');
-        navToggle?.setAttribute('aria-expanded', 'false');
+        if (!desktopNav.matches) setToggleState(false, 'Open navigation');
     };
 
+    applyDesktopSidebarPreference();
+
     navToggle?.addEventListener('click', () => {
+        if (desktopNav.matches) {
+            const collapsed = !body.classList.contains('sidebar-collapsed');
+            body.classList.toggle('sidebar-collapsed', collapsed);
+            setToggleState(!collapsed, collapsed ? 'Expand navigation' : 'Collapse navigation');
+            try {
+                localStorage.setItem(sidebarPreferenceKey, collapsed ? '1' : '0');
+            } catch (_) {}
+            return;
+        }
+
         const open = !body.classList.contains('nav-open');
         body.classList.toggle('nav-open', open);
-        navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        setToggleState(open, open ? 'Close navigation' : 'Open navigation');
     });
 
-    document.querySelectorAll('[data-nav-close]').forEach((element) => {
-        element.addEventListener('click', closeNav);
-    });
+    const syncNavigationMode = () => {
+        body.classList.remove('nav-open');
+        if (desktopNav.matches) applyDesktopSidebarPreference();
+        else {
+            body.classList.remove('sidebar-collapsed');
+            setToggleState(false, 'Open navigation');
+        }
+    };
 
-    document.querySelectorAll('.sidebar a').forEach((link) => {
-        link.addEventListener('click', () => {
-            if (window.matchMedia('(max-width: 900px)').matches) closeNav();
-        });
-    });
-
-    window.addEventListener('resize', () => {
-        if (window.innerWidth > 900) closeNav();
-    });
+    if (desktopNav.addEventListener) desktopNav.addEventListener('change', syncNavigationMode);
+    else desktopNav.addListener(syncNavigationMode);
 
     const accountMenu = document.querySelector('[data-account-menu]');
     const accountToggle = accountMenu?.querySelector('[data-account-toggle]');

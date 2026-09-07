@@ -9,6 +9,21 @@ if (! function_exists('ui_icon')) {
     }
 }
 
+
+if (! function_exists('current_role')) {
+    function current_role(): string
+    {
+        return (string) session()->get('role');
+    }
+}
+
+if (! function_exists('current_user_id')) {
+    function current_user_id(): int
+    {
+        return (int) session()->get('user_id');
+    }
+}
+
 if (! function_exists('role_label')) {
     function role_label(string $role): string
     {

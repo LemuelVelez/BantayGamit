@@ -29,3 +29,48 @@ html,body{max-width:100%;overflow-x:hidden}.content,.panel,.grid-2,.grid-3,.deta
 @media(max-width:480px){.request-item{grid-template-columns:1fr}.request-item .remove-item{width:100%;height:44px;min-height:44px}.toolbar .btn,.toolbar>a.btn{flex:1 1 100%}.panel-head>.btn,.panel-head>a.btn{width:100%}.actions{width:100%}.actions>.btn{flex:1 1 auto}.notification-row form{margin-left:0}.notification-row form .btn{width:100%}.confirmation-card{grid-template-columns:40px 1fr}.form-actions>.btn{min-width:0}}
 @media(max-width:360px){.menu-toggle,.icon-button{width:44px;height:44px}.content{padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}.form-dialog{width:calc(100vw - 8px);max-height:calc(100dvh - 8px)}.confirmation-card{width:calc(100vw - 8px);padding:14px}.table-wrap table{min-width:660px}}
 @media print{.pager,.result-count{display:none!important}.table-wrap{overflow:visible!important;box-shadow:none!important}.table-wrap th.actions-head,.table-wrap td.actions{position:static;box-shadow:none}}
+
+/* RBAC navigation motion, desktop collapse, and native control polish */
+.sidebar,.content,.topbar-logo,.nav-item,.nav-item>span:last-child,.menu-toggle-icon,.account-chevron,.sidebar-close-icon,.ui-icon{transition-property:width,margin,transform,opacity,background-color,color,border-color,box-shadow;transition-duration:.22s;transition-timing-function:cubic-bezier(.2,.8,.2,1)}
+.menu-toggle:hover .menu-toggle-icon{transform:scale(1.08) rotate(8deg)}
+.nav-open .menu-toggle-icon{transform:rotate(90deg) scale(1.06)}
+.profile-button .account-chevron{margin-left:2px;transform-origin:center}
+.profile-button[aria-expanded="true"] .account-chevron{transform:rotate(180deg)}
+.sidebar-close:hover .sidebar-close-icon{transform:rotate(90deg)}
+.nav-item:hover .nav-icon .ui-icon{transform:translateX(2px) scale(1.06)}
+.icon-button:hover .ui-icon,.btn:hover .ui-icon,.account-dropdown a:hover .ui-icon,.account-dropdown button:hover .ui-icon{transform:scale(1.08)}
+.notification-button span{animation:notification-pop .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes notification-pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+
+@media(min-width:901px){
+ body.sidebar-collapsed{--sidebar:76px}
+ body.sidebar-collapsed .topbar-logo{width:calc(var(--sidebar) - 12px)}
+ body.sidebar-collapsed .sidebar{padding-inline:10px;overflow-x:hidden}
+ body.sidebar-collapsed .sidebar-heading{justify-content:center;padding-inline:0}
+ body.sidebar-collapsed .sidebar-heading>span{width:0;opacity:0;overflow:hidden}
+ body.sidebar-collapsed .nav-item{justify-content:center;gap:0;padding-inline:10px}
+ body.sidebar-collapsed .nav-item>span:last-child{width:0;opacity:0;overflow:hidden;white-space:nowrap}
+ body.sidebar-collapsed .nav-icon{flex:0 0 22px}
+ body.sidebar-collapsed .menu-toggle-icon{transform:rotate(180deg)}
+}
+
+input,select,textarea{appearance:none;-webkit-appearance:none;background-color:#fff;border:1px solid var(--grey-300);border-radius:7px;color:var(--grey-700);transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease,color .16s ease}
+input:hover,select:hover,textarea:hover{border-color:#b8c2cf}
+input:focus,select:focus,textarea:focus{border-color:var(--secondary);box-shadow:0 0 0 3px rgba(103,58,183,.12);outline:0}
+input::placeholder,textarea::placeholder{color:#98a2b3;opacity:1}
+input:disabled,select:disabled,textarea:disabled{background:var(--grey-100);color:var(--grey-500);cursor:not-allowed}
+select{padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23697586' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px}
+select:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23673ab7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+input[type="date"]{padding-right:12px}
+input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.7;transition:opacity .16s ease,transform .16s ease}
+input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1;transform:scale(1.08)}
+input[type="number"]{-moz-appearance:textfield}
+input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{margin:0;opacity:.65}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--grey-700);box-shadow:0 0 0 1000px #fff inset;transition:background-color 9999s ease-out 0s}
+button,.btn,.profile-button,.account-dropdown a{transition:transform .14s ease,background-color .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease}
+button:active,.btn:active,.profile-button:active,.account-dropdown a:active{transform:scale(.98)}
+dialog[open]{animation:dialog-in .2s cubic-bezier(.2,.8,.2,1)}
+dialog[open]::backdrop{animation:backdrop-in .2s ease-out}
+@keyframes dialog-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes backdrop-in{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
