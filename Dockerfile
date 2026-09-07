@@ -1,8 +1,15 @@
 FROM php:8.2-apache AS php-base
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libicu-dev libonig-dev \
-    && docker-php-ext-install -j"$(nproc)" intl mbstring mysqli opcache \
+    && apt-get install -y --no-install-recommends \
+        libicu-dev \
+        libonig-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        libzip-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" intl mbstring mysqli opcache gd zip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
