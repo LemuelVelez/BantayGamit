@@ -10,6 +10,7 @@ class EquipmentLocationSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $now = date('Y-m-d H:i:s');
         $rows = [
             ['Barangay Hall Storage Room', 'Main secured equipment storage beside the barangay office.'],

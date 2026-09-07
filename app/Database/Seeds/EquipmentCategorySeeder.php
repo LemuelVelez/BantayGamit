@@ -10,6 +10,7 @@ class EquipmentCategorySeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $now = date('Y-m-d H:i:s');
         $rows = [
             ['Audio Equipment', 'Speakers, microphones, mixers, and related sound equipment.'],

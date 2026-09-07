@@ -10,6 +10,7 @@ class BorrowingSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $official = $this->idBy('users', 'username', 'official');
         $official2 = $this->idBy('users', 'username', 'official2');
         $borrowers = [
@@ -64,11 +65,12 @@ class BorrowingSeeder extends Seeder
 
         foreach ($requests as $seed) {
             $requestId = $this->upsertRequest($seed, $borrowers);
-            $this->db->table('borrow_request_items')->where('borrow_request_id', $requestId)->delete();
             foreach ($seed['items'] as [$code, $requested, $released, $returned, $releaseCondition, $returnCondition, $damageNotes]) {
-                $this->db->table('borrow_request_items')->insert([
+                $equipmentId = $this->idBy('equipment', 'asset_code', $code);
+                $this->upsertSeedRow('borrow_request_items', [
                     'borrow_request_id' => $requestId,
-                    'equipment_id' => $this->idBy('equipment', 'asset_code', $code),
+                    'equipment_id' => $equipmentId,
+                ], [
                     'quantity_requested' => $requested,
                     'quantity_released' => $released,
                     'quantity_returned' => $returned,

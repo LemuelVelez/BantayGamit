@@ -66,6 +66,8 @@ composer update phpoffice/phpspreadsheet -W
 php spark migrate
 ```
 
+For an existing development checkout that previously applied the superseded schema migration, re-initialize with `php spark migrate:refresh` before reseeding. This is development-only because `migrate:refresh` drops existing data. Fresh installations only need `php spark migrate`.
+
 6. Load development/demo data only in a development environment:
 
 ```bash
@@ -119,6 +121,7 @@ These are intentional development seeder credentials and must not be used in pro
 | Borrower | `juan` | `Borrower@12345` |
 | Borrower | `ana` | `Borrower@12345` |
 | Borrower | `mario` | `Borrower@12345` |
+| Borrower (inactive) | `inactive.borrower` | `Borrower@12345` |
 
 ## Database
 
@@ -136,6 +139,12 @@ Schema creation is migration-only; no SQL dump is required. The primary migratio
 - `settings`
 
 The migration `down()` method drops tables in reverse dependency order.
+
+### CLI output
+
+`php spark migrate`, `php spark db:seed <SeederName>`, and `php spark migrate:status` use BantayGamit's styled database output with database context, timings, migration status, and per-seeder inserted/updated/unchanged totals. The application commands override CodeIgniter's built-in `migrate`, `db:seed`, and `migrate:status` names.
+
+When output is piped or redirected, when `NO_COLOR` is set, or when `--no-ansi` is passed, the commands automatically use plain ASCII output without colour, emoji, or box-drawing characters.
 
 ## Architecture
 

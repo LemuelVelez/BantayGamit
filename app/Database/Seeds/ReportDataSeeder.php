@@ -10,6 +10,7 @@ class ReportDataSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $official = $this->idBy('users', 'username', 'official');
         $borrowerUsernames = ['borrower', 'juan', 'ana', 'mario'];
         $equipmentCodes = ['EQ-0003', 'EQ-0004', 'EQ-0005', 'EQ-0001', 'EQ-0010', 'EQ-0015'];
@@ -45,10 +46,11 @@ class ReportDataSeeder extends Seeder
                 'updated_at' => $returnedAt,
             ]);
 
-            $this->db->table('borrow_request_items')->where('borrow_request_id', $requestId)->delete();
-            $this->db->table('borrow_request_items')->insert([
+            $equipmentId = $this->idBy('equipment', 'asset_code', $code);
+            $this->upsertSeedRow('borrow_request_items', [
                 'borrow_request_id' => $requestId,
-                'equipment_id' => $this->idBy('equipment', 'asset_code', $code),
+                'equipment_id' => $equipmentId,
+            ], [
                 'quantity_requested' => $quantity,
                 'quantity_released' => $quantity,
                 'quantity_returned' => $quantity,

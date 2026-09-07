@@ -10,6 +10,7 @@ class UserSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $now = date('Y-m-d H:i:s');
         $users = [
             ['admin', 'Admin@12345', 'System Administrator', 'admin@bantaygamit.local', '0917 100 0001', 'Barangay Hall', 'admin', 'active'],
@@ -23,8 +24,17 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($users as [$username, $password, $displayName, $email, $contact, $address, $role, $status]) {
+            $existing = $this->db->table('users')
+                ->select('password_hash')
+                ->where('username', $username)
+                ->get()
+                ->getRowArray();
+            $passwordHash = $existing && password_verify($password, (string) $existing['password_hash'])
+                ? (string) $existing['password_hash']
+                : password_hash($password, PASSWORD_DEFAULT);
+
             $this->upsertSeedRow('users', ['username' => $username], [
-                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+                'password_hash' => $passwordHash,
                 'display_name' => $displayName,
                 'email' => $email,
                 'contact_number' => $contact,

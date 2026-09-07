@@ -10,6 +10,7 @@ class AuditLogSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $admin = $this->idBy('users', 'username', 'admin');
         $official = $this->idBy('users', 'username', 'official');
         $entries = [
@@ -21,7 +22,6 @@ class AuditLogSeeder extends Seeder
         ];
 
         foreach ($entries as [$actor, $action, $entityType, $entityId, $message]) {
-            $existing = $this->db->table('audit_logs')->where('action', $action)->get()->getRowArray();
             $data = [
                 'actor_user_id' => $actor,
                 'entity_type' => $entityType,
@@ -30,11 +30,7 @@ class AuditLogSeeder extends Seeder
                 'metadata' => json_encode(['source' => 'BantayGamitSeeder'], JSON_UNESCAPED_SLASHES),
                 'created_at' => date('Y-m-d H:i:s'),
             ];
-            if ($existing) {
-                $this->db->table('audit_logs')->where('id', (int) $existing['id'])->update($data);
-            } else {
-                $this->db->table('audit_logs')->insert(array_merge(['action' => $action], $data));
-            }
+            $this->upsertSeedRow('audit_logs', ['action' => $action], $data);
         }
     }
 }

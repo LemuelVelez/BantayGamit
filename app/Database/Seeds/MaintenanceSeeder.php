@@ -10,6 +10,7 @@ class MaintenanceSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $official = $this->idBy('users', 'username', 'official');
         $official2 = $this->idBy('users', 'username', 'official2');
         $rows = [
@@ -23,7 +24,6 @@ class MaintenanceSeeder extends Seeder
 
         foreach ($rows as [$equipmentName, $type, $description, $quantity, $status, $startOffset, $completionOffset, $cost, $seedKey, $reportedBy]) {
             $equipmentId = $this->idBy('equipment', 'name', $equipmentName);
-            $existing = $this->db->table('maintenance_records')->where('notes', $seedKey)->get()->getRowArray();
             $data = [
                 'equipment_id' => $equipmentId,
                 'reported_by' => $reportedBy,
@@ -38,11 +38,7 @@ class MaintenanceSeeder extends Seeder
                 'created_at' => $this->dateOffset('-30 days', 'Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
             ];
-            if ($existing) {
-                $this->db->table('maintenance_records')->where('id', (int) $existing['id'])->update($data);
-            } else {
-                $this->db->table('maintenance_records')->insert($data);
-            }
+            $this->upsertSeedRow('maintenance_records', ['notes' => $seedKey], $data);
         }
     }
 }

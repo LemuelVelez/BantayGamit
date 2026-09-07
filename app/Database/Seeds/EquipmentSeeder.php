@@ -10,6 +10,7 @@ class EquipmentSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $now = date('Y-m-d H:i:s');
         $rows = [
             ['EQ-0001', 'Portable PA Speaker', 'Audio Equipment', 'Barangay Hall Storage Room', 4, 'unit', 'good', 'available', '-20 months', 'Portable rechargeable PA speaker for meetings and events.'],

@@ -10,6 +10,7 @@ class SettingsSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $admin = $this->idBy('users', 'username', 'admin');
         $now = date('Y-m-d H:i:s');
         $settings = [

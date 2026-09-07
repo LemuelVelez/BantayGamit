@@ -6,20 +6,22 @@ use CodeIgniter\Database\Seeder;
 
 class BantayGamitSeeder extends Seeder
 {
+    public const SEQUENCE = [
+        UserSeeder::class,
+        EquipmentCategorySeeder::class,
+        EquipmentLocationSeeder::class,
+        EquipmentSeeder::class,
+        BorrowingSeeder::class,
+        MaintenanceSeeder::class,
+        ReportDataSeeder::class,
+        NotificationSeeder::class,
+        SettingsSeeder::class,
+        AuditLogSeeder::class,
+    ];
+
     public function run(): void
     {
-        foreach ([
-            UserSeeder::class,
-            EquipmentCategorySeeder::class,
-            EquipmentLocationSeeder::class,
-            EquipmentSeeder::class,
-            BorrowingSeeder::class,
-            MaintenanceSeeder::class,
-            ReportDataSeeder::class,
-            NotificationSeeder::class,
-            SettingsSeeder::class,
-            AuditLogSeeder::class,
-        ] as $seeder) {
+        foreach (self::SEQUENCE as $seeder) {
             $this->call($seeder);
         }
     }

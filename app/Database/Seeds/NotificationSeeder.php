@@ -10,6 +10,7 @@ class NotificationSeeder extends Seeder
 
     public function run(): void
     {
+        $this->resetSeedStats();
         $rows = [
             ['admin', 'request_submitted', 'New borrowing request BR-SEED-000001 is awaiting review.', 0, '-20 minutes'],
             ['official', 'request_submitted', 'New borrowing request BR-SEED-000001 is awaiting review.', 0, '-20 minutes'],
@@ -22,13 +23,14 @@ class NotificationSeeder extends Seeder
 
         foreach ($rows as [$username, $type, $message, $isRead, $createdOffset]) {
             $userId = $this->idBy('users', 'username', $username);
-            $existing = $this->db->table('notifications')->where(['user_id' => $userId, 'message' => $message])->get()->getRowArray();
-            $data = ['type' => $type, 'is_read' => $isRead, 'created_at' => $this->dateOffset($createdOffset, 'Y-m-d H:i:s')];
-            if ($existing) {
-                $this->db->table('notifications')->where('id', (int) $existing['id'])->update($data);
-            } else {
-                $this->db->table('notifications')->insert(array_merge(['user_id' => $userId, 'message' => $message], $data));
-            }
+            $this->upsertSeedRow('notifications', [
+                'user_id' => $userId,
+                'message' => $message,
+            ], [
+                'type' => $type,
+                'is_read' => $isRead,
+                'created_at' => $this->dateOffset($createdOffset, 'Y-m-d H:i:s'),
+            ]);
         }
     }
 }
