@@ -20,5 +20,7 @@ abstract class BaseController extends Controller
     protected function safeErrorMessage(\Throwable $e,string $fallback): string { return $e instanceof \RuntimeException && !($e instanceof \CodeIgniter\Database\Exceptions\DatabaseException)?$e->getMessage():$fallback; }
     protected function userId(): int { return (int)session()->get('user_id'); }
     protected function role(): string { return (string)session()->get('role'); }
+    protected function page(): int { return max(1,(int)$this->request->getGet('page')); }
+    protected function pagerLinks(int $page,int $perPage,int $total): string { return $total>$perPage?service('pager')->makeLinks($page,$perPage,$total,'default_full'):''; }
     public function initController(RequestInterface $request,ResponseInterface $response,LoggerInterface $logger): void { $this->helpers=['form','url','bantay']; parent::initController($request,$response,$logger); }
 }

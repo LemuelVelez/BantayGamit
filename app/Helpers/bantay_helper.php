@@ -44,3 +44,23 @@ if (! function_exists('fmt_date')) {
         return $time ? date($withTime ? 'M j, Y g:i A' : 'M j, Y', $time) : '—';
     }
 }
+
+if (! function_exists('form_error')) {
+    function form_error(string $field): string
+    {
+        $errors = session()->getFlashdata('errors');
+        if (! is_array($errors) || empty($errors[$field])) return '';
+        $id = 'error-' . (preg_replace('/[^a-z0-9_-]/i', '-', $field) ?: 'field');
+        return '<small class="field-error" id="' . esc($id, 'attr') . '">' . esc((string) $errors[$field]) . '</small>';
+    }
+}
+
+if (! function_exists('form_invalid')) {
+    function form_invalid(string $field): string
+    {
+        $errors = session()->getFlashdata('errors');
+        if (! is_array($errors) || empty($errors[$field])) return '';
+        $id = 'error-' . (preg_replace('/[^a-z0-9_-]/i', '-', $field) ?: 'field');
+        return ' aria-invalid="true" aria-describedby="' . esc($id, 'attr') . '"';
+    }
+}

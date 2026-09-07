@@ -1,3 +1,3 @@
 <?php
 namespace App\Controllers;
-class AuditLogsController extends BaseController { public function index(){return view('audit_logs/index',['title'=>'Audit Logs','logs'=>db_connect()->table('audit_logs a')->select('a.*,u.display_name actor_name')->join('users u','u.id=a.actor_user_id','left')->orderBy('a.created_at','DESC')->limit(250)->get()->getResultArray()]);} }
+class AuditLogsController extends BaseController { public function index(){$filters=['q'=>(string)$this->request->getGet('q')];$page=$this->repository()->auditLogsPage($filters,$this->page(),25);return view('audit_logs/index',['title'=>'Audit Logs','logs'=>$page['rows'],'pagerLinks'=>$this->pagerLinks($page['page'],25,$page['total']),'total'=>$page['total']]);} }

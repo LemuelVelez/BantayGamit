@@ -23,19 +23,21 @@ class MySqlEquipmentRepository implements EquipmentRepositoryInterface
 
     public function equipment(array $filters = []): array
     {
-        $builder = $this->db->table('equipment e')
-            ->select('e.*, c.name AS category_name, l.name AS location_name')
-            ->join('equipment_categories c', 'c.id=e.category_id')
-            ->join('equipment_locations l', 'l.id=e.location_id');
-        if (! empty($filters['q'])) {
-            $q = trim((string) $filters['q']);
-            $builder->groupStart()->like('e.name', $q)->orLike('e.asset_code', $q)->orLike('e.description', $q)->groupEnd();
-        }
-        if (! empty($filters['status'])) $builder->where('e.status', $filters['status']);
-        if (! empty($filters['category_id'])) $builder->where('e.category_id', (int) $filters['category_id']);
-        $rows = $builder->orderBy('e.name')->get()->getResultArray();
+        $rows = $this->equipmentBuilder($filters)->orderBy('e.name')->get()->getResultArray();
         foreach ($rows as &$row) $row['available_quantity'] = $this->availableQuantity((int) $row['id']);
+        unset($row);
         return $rows;
+    }
+
+    public function equipmentPage(array $filters, int $page, int $perPage = 20): array
+    {
+        $countBuilder = $this->equipmentBuilder($filters);
+        $total = $countBuilder->countAllResults();
+        $page = $this->normalizePage($page, $perPage, $total);
+        $rows = $this->equipmentBuilder($filters)->orderBy('e.name')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+        foreach ($rows as &$row) $row['available_quantity'] = $this->availableQuantity((int) $row['id']);
+        unset($row);
+        return ['rows' => $rows, 'total' => $total, 'page' => $page];
     }
 
     public function findEquipment(int $id): ?array
@@ -90,6 +92,25 @@ class MySqlEquipmentRepository implements EquipmentRepositoryInterface
         return $b->orderBy('br.created_at','DESC')->get()->getResultArray();
     }
 
+    public function borrowRequestsPage(string $role, int $userId, array $filters, int $page, int $perPage = 20): array
+    {
+        $status = trim((string) ($filters['status'] ?? ''));
+        $q = trim((string) ($filters['q'] ?? ''));
+        $count = $this->db->table('borrow_requests br')->join('users u', 'u.id=br.borrower_id');
+        $this->applyBorrowRequestFilters($count, $role, $userId, $status, $q);
+        $total = $count->countAllResults();
+        $page = $this->normalizePage($page, $perPage, $total);
+
+        $rows = $this->db->table('borrow_requests br')
+            ->select('br.*,u.display_name AS borrower_name,COUNT(bri.id) AS item_count,COALESCE(SUM(bri.quantity_requested),0) AS requested_units', false)
+            ->join('users u', 'u.id=br.borrower_id')
+            ->join('borrow_request_items bri', 'bri.borrow_request_id=br.id', 'left')
+            ->groupBy('br.id');
+        $this->applyBorrowRequestFilters($rows, $role, $userId, $status, $q);
+        $result = $rows->orderBy('br.created_at', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+        return ['rows' => $result, 'total' => $total, 'page' => $page];
+    }
+
     public function findBorrowRequest(int $id): ?array
     {
         return $this->db->table('borrow_requests br')->select('br.*,u.display_name AS borrower_name,u.email AS borrower_email,u.contact_number AS borrower_contact,u.address AS borrower_address')
@@ -105,6 +126,33 @@ class MySqlEquipmentRepository implements EquipmentRepositoryInterface
     public function notifications(int $userId, int $limit = 50): array
     {
         return $this->db->table('notifications')->where('user_id',$userId)->orderBy('created_at','DESC')->limit($limit)->get()->getResultArray();
+    }
+
+    public function notificationsPage(int $userId, array $filters, int $page, int $perPage = 25): array
+    {
+        $q = trim((string) ($filters['q'] ?? ''));
+        $read = (string) ($filters['read'] ?? '');
+        $count = $this->db->table('notifications')->where('user_id', $userId);
+        $this->applyNotificationFilters($count, $q, $read);
+        $total = $count->countAllResults();
+        $page = $this->normalizePage($page, $perPage, $total);
+        $rows = $this->db->table('notifications')->where('user_id', $userId);
+        $this->applyNotificationFilters($rows, $q, $read);
+        $result = $rows->orderBy('created_at', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+        return ['rows' => $result, 'total' => $total, 'page' => $page];
+    }
+
+    public function auditLogsPage(array $filters, int $page, int $perPage = 25): array
+    {
+        $q = trim((string) ($filters['q'] ?? ''));
+        $count = $this->db->table('audit_logs a')->join('users u', 'u.id=a.actor_user_id', 'left');
+        $this->applyAuditFilters($count, $q);
+        $total = $count->countAllResults();
+        $page = $this->normalizePage($page, $perPage, $total);
+        $rows = $this->db->table('audit_logs a')->select('a.*,u.display_name actor_name')->join('users u', 'u.id=a.actor_user_id', 'left');
+        $this->applyAuditFilters($rows, $q);
+        $result = $rows->orderBy('a.created_at', 'DESC')->limit($perPage, ($page - 1) * $perPage)->get()->getResultArray();
+        return ['rows' => $result, 'total' => $total, 'page' => $page];
     }
 
     public function dashboard(string $role, int $userId): array
@@ -146,4 +194,48 @@ class MySqlEquipmentRepository implements EquipmentRepositoryInterface
         }
         return $stats;
     }
+    private function equipmentBuilder(array $filters)
+    {
+        $builder = $this->db->table('equipment e')
+            ->select('e.*,c.name AS category_name,l.name AS location_name')
+            ->join('equipment_categories c', 'c.id=e.category_id')
+            ->join('equipment_locations l', 'l.id=e.location_id');
+        if (! empty($filters['q'])) {
+            $q = trim((string) $filters['q']);
+            $builder->groupStart()->like('e.name', $q)->orLike('e.asset_code', $q)->orLike('e.description', $q)->groupEnd();
+        }
+        if (! empty($filters['status'])) $builder->where('e.status', (string) $filters['status']);
+        if (! empty($filters['category_id'])) $builder->where('e.category_id', (int) $filters['category_id']);
+        return $builder;
+    }
+
+    private function applyBorrowRequestFilters($builder, string $role, int $userId, string $status, string $q): void
+    {
+        if ($role === 'borrower') $builder->where('br.borrower_id', $userId);
+        if ($status !== '' && array_key_exists($status, config('BantayGamit')->requestStatuses)) $builder->where('br.status', $status);
+        if ($q !== '') {
+            $builder->groupStart()->like('br.request_number', $q)->orLike('br.purpose', $q)->orLike('u.display_name', $q)->groupEnd();
+        }
+    }
+
+    private function applyNotificationFilters($builder, string $q, string $read): void
+    {
+        if ($read === 'unread') $builder->where('is_read', 0);
+        if ($read === 'read') $builder->where('is_read', 1);
+        if ($q !== '') $builder->groupStart()->like('message', $q)->orLike('type', $q)->groupEnd();
+    }
+
+    private function applyAuditFilters($builder, string $q): void
+    {
+        if ($q !== '') {
+            $builder->groupStart()->like('a.action', $q)->orLike('a.entity_type', $q)->orLike('a.message', $q)->orLike('u.display_name', $q)->groupEnd();
+        }
+    }
+
+    private function normalizePage(int $page, int $perPage, int $total): int
+    {
+        $last = max(1, (int) ceil($total / max(1, $perPage)));
+        return max(1, min($page, $last));
+    }
+
 }
