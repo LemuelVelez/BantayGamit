@@ -71,15 +71,15 @@ For an existing development checkout that previously applied the superseded sche
 6. Load development/demo data only in a development environment:
 
 ```bash
-php spark db:seed BantayGamitSeeder
+php spark seed
 ```
 
 The master seeder runs the dependency-ordered seeders for users, categories, locations, equipment, borrowing workflows, maintenance, historical report data, notifications, settings, and audit logs. Individual seeders can also be run directly, for example:
 
 ```bash
-php spark db:seed UserSeeder
-php spark db:seed EquipmentSeeder
-php spark db:seed ReportDataSeeder
+php spark seed UserSeeder
+php spark seed EquipmentSeeder
+php spark seed ReportDataSeeder
 ```
 
 7. Start the local server:
@@ -142,7 +142,7 @@ The migration `down()` method drops tables in reverse dependency order.
 
 ### CLI output
 
-`php spark migrate`, `php spark db:seed <SeederName>`, and `php spark migrate:status` use BantayGamit's styled database output with database context, timings, migration status, and per-seeder inserted/updated/unchanged totals. The application commands override CodeIgniter's built-in `migrate`, `db:seed`, and `migrate:status` names.
+`php spark migrate`, `php spark seed [SeederName]`, `php spark db:seed [SeederName]`, and `php spark migrate:status` use BantayGamit's styled database output. Running `php spark seed` with no argument executes the full dependency-ordered seeder sequence, prints rows only for seeders that insert or update data, and shows a compact `No pending seed data` panel when everything is already seeded. `db:seed` remains available as the compatible long-form command.
 
 When output is piped or redirected, when `NO_COLOR` is set, or when `--no-ansi` is passed, the commands automatically use plain ASCII output without colour, emoji, or box-drawing characters.
 

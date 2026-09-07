@@ -5,7 +5,6 @@ namespace App\Commands;
 use App\Commands\Concerns\ConsoleStyle;
 use App\Database\Seeds\BantayGamitSeeder;
 use CodeIgniter\CLI\BaseCommand;
-use CodeIgniter\CLI\CLI;
 use Config\Database;
 use Throwable;
 
@@ -16,9 +15,9 @@ class SeedCommand extends BaseCommand
     protected $group = 'Database';
     protected $name = 'db:seed';
     protected $description = 'Runs BantayGamit seeders with per-seeder change statistics.';
-    protected $usage = 'db:seed <seeder_name> [--no-ansi]';
+    protected $usage = 'db:seed [seeder_name] [--no-ansi]';
     protected $arguments = [
-        'seeder_name' => 'The seeder name to run',
+        'seeder_name' => 'Optional seeder name. Defaults to BantayGamitSeeder.',
     ];
     protected $options = [
         '--no-ansi' => 'Disable colour, emoji, and box-drawing output',
@@ -29,14 +28,9 @@ class SeedCommand extends BaseCommand
         $this->initializeConsoleStyle();
         $this->banner('BantayGamit · Database Seeding');
 
-        $seedName = array_shift($params);
-        if (empty($seedName)) {
-            $this->errorLine('Seeder name is required. Example: php spark db:seed BantayGamitSeeder');
-
-            return EXIT_ERROR;
-        }
-
+        $seedName = array_shift($params) ?: 'BantayGamitSeeder';
         $targetClass = $this->resolveSeederClass((string) $seedName);
+
         if (! class_exists($targetClass)) {
             $this->errorLine('Seeder not found: ' . $seedName);
 
@@ -62,6 +56,7 @@ class SeedCommand extends BaseCommand
             'updated' => 0,
             'unchanged' => 0,
         ];
+        $unchangedSeeders = 0;
         $overallStart = microtime(true);
 
         foreach ($sequence as $seederClass) {
@@ -71,7 +66,8 @@ class SeedCommand extends BaseCommand
                 $seeder = new $seederClass($config);
                 $seeder->setSilent(true);
                 $seeder->run();
-                $stats = method_exists($seeder, 'seedStats')
+                $hasStats = method_exists($seeder, 'seedStats');
+                $stats = $hasStats
                     ? $seeder->seedStats()
                     : ['inserted' => 0, 'updated' => 0, 'unchanged' => 0];
                 $elapsed = microtime(true) - $start;
@@ -80,7 +76,14 @@ class SeedCommand extends BaseCommand
                     $totals[$key] += (int) ($stats[$key] ?? 0);
                 }
 
-                $this->seederRow($seederClass, $stats, $elapsed);
+                $hasChanges = (int) ($stats['inserted'] ?? 0) > 0
+                    || (int) ($stats['updated'] ?? 0) > 0;
+
+                if ($hasChanges || ! $hasStats) {
+                    $this->seederRow($seederClass, $stats, $elapsed);
+                } else {
+                    $unchangedSeeders++;
+                }
             } catch (Throwable $e) {
                 $elapsed = microtime(true) - $start;
                 $this->failedSeederRow($seederClass, $elapsed, $e->getMessage());
@@ -97,11 +100,25 @@ class SeedCommand extends BaseCommand
         $this->divider();
 
         if ($totals['inserted'] === 0 && $totals['updated'] === 0) {
-            $this->summaryLine(
-                '🌱',
-                'Already seeded  ·  ' . $totals['unchanged'] . ' unchanged  ·  ' . $this->formatDuration($elapsed),
+            $this->summaryLine('✨', 'No pending seed data — database is already up to date.', 'light_green');
+            $this->sectionRow(
+                '📚',
+                'Checked',
+                $this->pluralize(count($sequence), 'seeder') . '  ·  '
+                . $this->pluralize($totals['unchanged'], 'existing row') . '  ·  '
+                . $this->formatDuration($elapsed),
+                'light_gray',
             );
         } else {
+            if ($unchangedSeeders > 0) {
+                $this->sectionRow(
+                    '⏭️',
+                    'Existing',
+                    $this->pluralize($unchangedSeeders, 'seeder') . ' already up to date',
+                    'light_gray',
+                );
+            }
+
             $this->summaryLine(
                 '🌱',
                 'Seeded  ·  ' . $totals['inserted'] . ' new  ·  ' . $totals['updated'] . ' updated  ·  '

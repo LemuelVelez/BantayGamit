@@ -123,7 +123,7 @@ trait ConsoleStyle
 
     protected function summaryLine(string $emoji, string $text, string $color = 'light_green'): void
     {
-        $fallbacks = ['❌' => '[xx]', '⚠️' => '[!!]', '⏭️' => '[--]'];
+        $fallbacks = ['❌' => '[xx]', '⚠️' => '[!!]', '⏭️' => '[--]', '✨' => '[--]'];
         $this->styleLine('  ' . $this->glyph($emoji, $fallbacks[$emoji] ?? '[ok]') . '  ' . $text, $color);
     }
 
