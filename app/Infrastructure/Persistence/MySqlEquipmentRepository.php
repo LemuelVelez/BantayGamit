@@ -49,6 +49,14 @@ class MySqlEquipmentRepository implements EquipmentRepositoryInterface
         return $row ?: null;
     }
 
+    public function lockEquipment(int $id): ?array
+    {
+        return $this->db->query(
+            'SELECT * FROM equipment WHERE id = ? FOR UPDATE',
+            [$id],
+        )->getRowArray() ?: null;
+    }
+
     public function equipmentOptions(): array
     {
         $rows = $this->equipment(['status'=>'available']);

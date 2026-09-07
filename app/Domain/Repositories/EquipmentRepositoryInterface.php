@@ -9,6 +9,7 @@ interface EquipmentRepositoryInterface
     public function equipment(array $filters = []): array;
     public function equipmentPage(array $filters, int $page, int $perPage = 20): array;
     public function findEquipment(int $id): ?array;
+    public function lockEquipment(int $id): ?array;
     public function equipmentOptions(): array;
     public function categories(bool $activeOnly = false): array;
     public function locations(bool $activeOnly = false): array;

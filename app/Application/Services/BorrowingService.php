@@ -32,9 +32,11 @@ class BorrowingService
         $clean=[];
         foreach($items as $item){$eid=(int)($item['equipment_id']??0);$qty=(int)($item['quantity']??0);if($eid<1||$qty<1)continue;if(isset($clean[$eid]))$clean[$eid]+=$qty;else$clean[$eid]=$qty;}
         if(!$clean)throw new RuntimeException('Select valid equipment quantities.');
-        foreach($clean as $eid=>$qty){$eq=$this->repository->findEquipment($eid);if(!$eq)throw new RuntimeException('Selected equipment no longer exists.');if($qty>$this->repository->availableQuantity($eid))throw new RuntimeException($eq['name'].' does not have enough available quantity.');}
+        ksort($clean,SORT_NUMERIC);
+
         $db=db_connect();$db->transBegin();
         try{
+            foreach($clean as $eid=>$qty){$eq=$this->repository->lockEquipment($eid);if(!$eq)throw new RuntimeException('Selected equipment no longer exists.');if($qty>$this->repository->availableQuantity($eid))throw new RuntimeException($eq['name'].' does not have enough available quantity.');}
             $requestModel=new BorrowRequestModel();$requestModel->insert(['request_number'=>null,'borrower_id'=>$borrowerId,'purpose'=>trim($payload['purpose']),'requested_date'=>$requested,'expected_return_date'=>$expected,'status'=>'pending','notes'=>trim((string)($payload['notes']??''))?:null]);
             $id=(int)$requestModel->getInsertID();$number=sprintf('BR-%s-%06d',date('Y'),$id);$requestModel->update($id,['request_number'=>$number]);
             $itemModel=new BorrowRequestItemModel();foreach($clean as $eid=>$qty)$itemModel->insert(['borrow_request_id'=>$id,'equipment_id'=>$eid,'quantity_requested'=>$qty,'quantity_released'=>0,'quantity_returned'=>0]);
@@ -52,22 +54,28 @@ class BorrowingService
 
     public function approve(int $requestId,int $officialId): void
     {
-        $request=$this->requireRequest($requestId);$this->assertStaffActor($request,$officialId);$this->assertTransition($request['status'],'approved');
-        foreach($this->repository->borrowRequestItems($requestId) as $item){$available=$this->repository->availableQuantity((int)$item['equipment_id'],$requestId);if((int)$item['quantity_requested']>$available)throw new RuntimeException($item['equipment_name'].' no longer has enough stock to approve this request.');}
-        $db=db_connect();$db->transBegin();try{(new BorrowRequestModel())->update($requestId,['status'=>'approved','approved_by'=>$officialId,'approved_at'=>date('Y-m-d H:i:s'),'rejection_reason'=>null]);$this->audit->log($officialId,'request_approved','borrow_request',$requestId,'Approved borrowing request '.$request['request_number']);$this->notifications->notify((int)$request['borrower_id'],'request_approved','Your request '.$request['request_number'].' was approved.');if($db->transStatus()===false)throw new RuntimeException('Approval failed.');$db->transCommit();}catch(\Throwable $e){$db->transRollback();throw $e;}
+        $request=$this->requireRequest($requestId);$this->assertStaffActor($request,$officialId);$this->assertTransition($request['status'],'approved');$items=$this->repository->borrowRequestItems($requestId);$this->sortItemsByEquipmentId($items);
+        $db=db_connect();$db->transBegin();
+        try{
+            foreach($items as $item){if(!$this->repository->lockEquipment((int)$item['equipment_id']))throw new RuntimeException('Selected equipment no longer exists.');$available=$this->repository->availableQuantity((int)$item['equipment_id'],$requestId);if((int)$item['quantity_requested']>$available)throw new RuntimeException($item['equipment_name'].' no longer has enough stock to approve this request.');}
+            (new BorrowRequestModel())->update($requestId,['status'=>'approved','approved_by'=>$officialId,'approved_at'=>date('Y-m-d H:i:s'),'rejection_reason'=>null]);$this->audit->log($officialId,'request_approved','borrow_request',$requestId,'Approved borrowing request '.$request['request_number']);$this->notifications->notify((int)$request['borrower_id'],'request_approved','Your request '.$request['request_number'].' was approved.');if($db->transStatus()===false)throw new RuntimeException('Approval failed.');$db->transCommit();
+        }catch(\Throwable $e){$db->transRollback();throw $e;}
     }
 
     public function reject(int $requestId,int $officialId,string $reason): void
     {
-        $request=$this->requireRequest($requestId);$this->assertStaffActor($request,$officialId);$this->assertTransition($request['status'],'rejected');if(trim($reason)==='')throw new RuntimeException('A rejection reason is required.');
-        $db=db_connect();$db->transBegin();try{(new BorrowRequestModel())->update($requestId,['status'=>'rejected','approved_by'=>$officialId,'approved_at'=>date('Y-m-d H:i:s'),'rejection_reason'=>trim($reason)]);$this->audit->log($officialId,'request_rejected','borrow_request',$requestId,'Rejected borrowing request '.$request['request_number']);$this->notifications->notify((int)$request['borrower_id'],'request_rejected','Your request '.$request['request_number'].' was rejected: '.trim($reason));if($db->transStatus()===false)throw new RuntimeException('Rejection failed.');$db->transCommit();}catch(\Throwable $e){$db->transRollback();throw $e;}
+        $request=$this->requireRequest($requestId);$this->assertStaffActor($request,$officialId);$this->assertTransition($request['status'],'rejected');$reason=trim($reason);if($reason==='')throw new RuntimeException('A rejection reason is required.');
+        $db=db_connect();$db->transBegin();try{(new BorrowRequestModel())->update($requestId,['status'=>'rejected','approved_by'=>$officialId,'approved_at'=>date('Y-m-d H:i:s'),'rejection_reason'=>$reason]);$this->audit->log($officialId,'request_rejected','borrow_request',$requestId,'Rejected borrowing request '.$request['request_number']);$this->notifications->notify((int)$request['borrower_id'],'request_rejected','Your request '.$request['request_number'].' was rejected: '.$reason);if($db->transStatus()===false)throw new RuntimeException('Rejection failed.');$db->transCommit();}catch(\Throwable $e){$db->transRollback();throw $e;}
     }
 
     public function release(int $requestId,int $officialId,array $conditions): void
     {
-        $request=$this->requireRequest($requestId);$this->assertStaffActor($request,$officialId);$this->assertTransition($request['status'],'released');$items=$this->repository->borrowRequestItems($requestId);
-        foreach($items as $item){$available=$this->repository->availableQuantity((int)$item['equipment_id'],$requestId);if((int)$item['quantity_requested']>$available)throw new RuntimeException($item['equipment_name'].' no longer has enough stock to release.');}
-        $db=db_connect();$db->transBegin();try{$model=new BorrowRequestItemModel();foreach($items as $item){$condition=(string)($conditions[(int)$item['id']]??'good');if(!array_key_exists($condition,config('BantayGamit')->conditions))$condition='good';$model->update((int)$item['id'],['quantity_released'=>(int)$item['quantity_requested'],'condition_on_release'=>$condition]);}(new BorrowRequestModel())->update($requestId,['status'=>'released','released_by'=>$officialId,'released_at'=>date('Y-m-d H:i:s')]);$this->audit->log($officialId,'equipment_released','borrow_request',$requestId,'Released equipment for '.$request['request_number']);$this->notifications->notify((int)$request['borrower_id'],'equipment_released','Equipment for '.$request['request_number'].' has been released.');if($db->transStatus()===false)throw new RuntimeException('Release failed.');$db->transCommit();}catch(\Throwable $e){$db->transRollback();throw $e;}
+        $request=$this->requireRequest($requestId);$this->assertStaffActor($request,$officialId);$this->assertTransition($request['status'],'released');$items=$this->repository->borrowRequestItems($requestId);$this->sortItemsByEquipmentId($items);
+        $db=db_connect();$db->transBegin();
+        try{
+            foreach($items as $item){if(!$this->repository->lockEquipment((int)$item['equipment_id']))throw new RuntimeException('Selected equipment no longer exists.');$available=$this->repository->availableQuantity((int)$item['equipment_id'],$requestId);if((int)$item['quantity_requested']>$available)throw new RuntimeException($item['equipment_name'].' no longer has enough stock to release.');}
+            $model=new BorrowRequestItemModel();foreach($items as $item){$condition=(string)($conditions[(int)$item['id']]??'good');if(!array_key_exists($condition,config('BantayGamit')->conditions))$condition='good';$model->update((int)$item['id'],['quantity_released'=>(int)$item['quantity_requested'],'condition_on_release'=>$condition]);}(new BorrowRequestModel())->update($requestId,['status'=>'released','released_by'=>$officialId,'released_at'=>date('Y-m-d H:i:s')]);$this->audit->log($officialId,'equipment_released','borrow_request',$requestId,'Released equipment for '.$request['request_number']);$this->notifications->notify((int)$request['borrower_id'],'equipment_released','Equipment for '.$request['request_number'].' has been released.');if($db->transStatus()===false)throw new RuntimeException('Release failed.');$db->transCommit();
+        }catch(\Throwable $e){$db->transRollback();throw $e;}
     }
 
     public function returnAll(int $requestId,int $officialId,array $conditions,array $damageNotes): void
@@ -82,9 +90,9 @@ class BorrowingService
         $today = date('Y-m-d');
         $rows = $db->table('borrow_requests')->where('status', 'released')->where('expected_return_date <', $today)->get()->getResultArray();
         $count = 0;
-        $model = new BorrowRequestModel();
         foreach ($rows as $r) {
-            $model->update((int) $r['id'], ['status' => 'overdue']);
+            $updated = $db->table('borrow_requests')->where('id', (int) $r['id'])->where('status', 'released')->update(['status' => 'overdue']);
+            if (! $updated || $db->affectedRows() !== 1) continue;
             $this->notifications->notify((int) $r['borrower_id'], 'equipment_overdue', 'Borrowing request ' . $r['request_number'] . ' is overdue.');
             $count++;
         }
@@ -103,6 +111,7 @@ class BorrowingService
         return $count;
     }
 
+    private function sortItemsByEquipmentId(array &$items): void { usort($items,static fn(array $a,array $b): int=>(int)$a['equipment_id']<=>(int)$b['equipment_id']); }
     private function transition(array $request,string $to,int $actorId,array $context=[]): void {$this->assertTransition($request['status'],$to);(new BorrowRequestModel())->update((int)$request['id'],['status'=>$to]);$this->audit->log($actorId,'request_'.$to,'borrow_request',(int)$request['id'],$context['message']??ucfirst($to).' '.$request['request_number']);}
     private function assertTransition(string $from,string $to): void { if(!self::isTransitionAllowed($from,$to))throw new RuntimeException('Invalid request status transition from '.$from.' to '.$to.'.'); }
     private function requireRequest(int $id): array { $r=$this->repository->findBorrowRequest($id);if(!$r)throw new RuntimeException('Borrowing request not found.');return $r; }

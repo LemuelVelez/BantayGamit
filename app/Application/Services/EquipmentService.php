@@ -13,20 +13,33 @@ class EquipmentService {
         $id=(int)$model->getInsertID(); $this->audit->log($actorId,'equipment_created','equipment',$id,'Created equipment '.$data['asset_code']); return $id;
     }
     public function update(int $id,array $data,int $actorId): void {
-        $this->validateInventory($data); $this->validateReferences($data); $model=new EquipmentModel(); $existing=$model->find($id);if(!$existing) throw new RuntimeException('Equipment not found.');if($existing['status']==='retired')throw new RuntimeException('Restore retired equipment before editing it.');
-        $dup=$model->where('asset_code',$data['asset_code'])->where('id !=',$id)->first(); if($dup)throw new RuntimeException('Asset code is already in use.');
-        $active=$this->activeAllocatedQuantity($id); if((int)$data['total_quantity']<$active) throw new RuntimeException('Total quantity cannot be lower than quantities currently reserved, borrowed, or under maintenance.');
-        try{$model->update($id,$data);}catch(\Throwable $e){throw new RuntimeException('Equipment could not be updated because the asset code or related record is invalid.',0,$e);}
-        $this->audit->log($actorId,'equipment_updated','equipment',$id,'Updated equipment '.$data['asset_code']);
+        $this->validateInventory($data); $this->validateReferences($data); $model=new EquipmentModel();
+        $db=db_connect();$db->transBegin();
+        try{
+            $existing=$this->repository->lockEquipment($id);if(!$existing) throw new RuntimeException('Equipment not found.');if($existing['status']==='retired')throw new RuntimeException('Restore retired equipment before editing it.');
+            $dup=$model->where('asset_code',$data['asset_code'])->where('id !=',$id)->first(); if($dup)throw new RuntimeException('Asset code is already in use.');
+            $active=$this->activeAllocatedQuantity($id); if((int)$data['total_quantity']<$active) throw new RuntimeException('Total quantity cannot be lower than quantities currently reserved, borrowed, or under maintenance.');
+            try{$model->update($id,$data);}catch(\Throwable $e){throw new RuntimeException('Equipment could not be updated because the asset code or related record is invalid.',0,$e);}
+            $this->audit->log($actorId,'equipment_updated','equipment',$id,'Updated equipment '.$data['asset_code']);
+            if($db->transStatus()===false)throw new RuntimeException('Equipment could not be updated.');$db->transCommit();
+        }catch(\Throwable $e){$db->transRollback();throw $e;}
     }
     public function retire(int $id,int $actorId): void {
-        $model=new EquipmentModel();$equipment=$model->find($id);if(!$equipment)throw new RuntimeException('Equipment not found.');if($equipment['status']==='retired')return;
-        if($this->hasOpenDependents($id))throw new RuntimeException('Equipment cannot be retired while it has a pending or active borrowing request or active maintenance record.');
-        $model->update($id,['status'=>'retired']);$this->audit->log($actorId,'equipment_retired','equipment',$id,'Retired equipment '.$equipment['asset_code']);
+        $model=new EquipmentModel();$db=db_connect();$db->transBegin();
+        try{
+            $equipment=$this->repository->lockEquipment($id);if(!$equipment)throw new RuntimeException('Equipment not found.');if($equipment['status']==='retired'){$db->transCommit();return;}
+            if($this->hasOpenDependents($id))throw new RuntimeException('Equipment cannot be retired while it has a pending or active borrowing request or active maintenance record.');
+            $model->update($id,['status'=>'retired']);$this->audit->log($actorId,'equipment_retired','equipment',$id,'Retired equipment '.$equipment['asset_code']);
+            if($db->transStatus()===false)throw new RuntimeException('Equipment could not be retired.');$db->transCommit();
+        }catch(\Throwable $e){$db->transRollback();throw $e;}
     }
     public function restore(int $id,int $actorId): void {
-        $model=new EquipmentModel();$equipment=$model->find($id);if(!$equipment)throw new RuntimeException('Equipment not found.');if($equipment['status']!=='retired')throw new RuntimeException('Only retired equipment can be restored.');
-        $model->update($id,['status'=>'unavailable']);$this->audit->log($actorId,'equipment_restored','equipment',$id,'Restored equipment '.$equipment['asset_code'].' as unavailable');
+        $model=new EquipmentModel();$db=db_connect();$db->transBegin();
+        try{
+            $equipment=$this->repository->lockEquipment($id);if(!$equipment)throw new RuntimeException('Equipment not found.');if($equipment['status']!=='retired')throw new RuntimeException('Only retired equipment can be restored.');
+            $model->update($id,['status'=>'unavailable']);$this->audit->log($actorId,'equipment_restored','equipment',$id,'Restored equipment '.$equipment['asset_code'].' as unavailable');
+            if($db->transStatus()===false)throw new RuntimeException('Equipment could not be restored.');$db->transCommit();
+        }catch(\Throwable $e){$db->transRollback();throw $e;}
     }
     private function validateInventory(array $data): void {
         if(trim((string)($data['asset_code']??''))===''||trim((string)($data['name']??''))==='')throw new RuntimeException('Asset code and equipment name are required.');
